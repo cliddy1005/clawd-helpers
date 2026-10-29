@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "$HOME/.claude/clawd-notify.sh idle" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "$HOME/.claude/clawd-notify.sh working" }] }],
+    "PostToolUse":      [{ "matcher": "*", "hooks": [{ "type": "command", "command": "$HOME/.claude/clawd-notify.sh working" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "$HOME/.claude/clawd-notify.sh waiting" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "$HOME/.claude/clawd-notify.sh done" }] }]
+  }
+}
