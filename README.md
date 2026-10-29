@@ -2,6 +2,7 @@
 
 Connect **Clawd**, a little desk companion with a touch screen, to **Claude Code** and **opencode**.
 Clawd shows a status light while your coding agent works and flashes **"Claude needs you"** with a chime when it's waiting on you.
+It works over **Wi-Fi** or simply **plugged into your computer by USB**, and nothing runs in the background: Claude Code or opencode fires the helper only when something happens.
 
 | Your agent | Clawd shows |
 |---|---|
@@ -60,58 +61,56 @@ The plugin (`opencode/clawd.js`) listens to opencode's events and drives the sam
 | `session.error` | Alert, so you notice the error |
 | `session.idle` | Green light and done chime |
 
-To install by hand, copy `opencode/clawd.js` into `~/.config/opencode/plugins/` (all projects) or `.opencode/plugins/` in a project, then restart opencode. It uses the same `CLAWD_HOST` and `CLAWD_BRIDGE` settings as the Claude Code hook.
+To install by hand, copy `opencode/clawd.js` into `~/.config/opencode/plugins/` (all projects) or `.opencode/plugins/` in a project, then restart opencode. It uses the same `CLAWD_HOST` and `CLAWD_PORT` settings as the Claude Code hook.
 
 ## Reaching Clawd
 
-The helpers send every event two ways. Clawd ignores the duplicate when both arrive.
+The helpers send every event both ways. Clawd ignores the duplicate when both arrive, so you can use either or both.
 
-**Wi-Fi (recommended).** Put Clawd on your home Wi-Fi: join Clawd's own network `Clawd` (password `clawd1234`), open `http://192.168.4.1/setup` and enter your Wi-Fi details. Your computer then reaches it at `clawd.local`.
+**Plugged in by USB (no setup).** Plug Clawd into the computer that runs Claude Code or opencode with a USB-C data cable. The helpers find Clawd's USB port by themselves (`/dev/cu.usbmodem…` on a Mac, the Espressif device in `/dev/serial/by-id/` on Linux) and write one line per event.
+If you have other USB dev boards plugged in, tell the helpers which port is Clawd, or turn USB off:
+
+```sh
+export CLAWD_PORT=/dev/cu.usbmodem101   # Clawd's port
+export CLAWD_PORT=none                  # never use USB
+```
+
+**Wi-Fi.** Use this when Clawd sits away from the computer, powered by any charger. Put Clawd on your home Wi-Fi: join Clawd's own network `Clawd` (password `clawd1234`), open `http://192.168.4.1/setup` and enter your Wi-Fi details. Your computer then reaches it at `clawd.local`.
 If `.local` names don't work on your network, swipe to Clawd's Info view for its IP address and set:
 
 ```sh
 export CLAWD_HOST=192.168.1.42   # your Clawd's IP
 ```
 
-**Bluetooth (no Wi-Fi needed).** Run the bridge and leave it open:
-
-```sh
-python3 -m pip install -r bluetooth/requirements.txt
-python3 bluetooth/clawd-ble-bridge.py
-```
-
-Allow Bluetooth access when asked. Don't pair Clawd in your Bluetooth settings: it doesn't need pairing.
-
 ## Test
 
 ```sh
-curl "http://clawd.local/cc?state=waiting&msg=Hello&project=test"      # Wi-Fi
-curl "http://127.0.0.1:8765/cc?state=waiting&msg=Hello&project=test"    # Bluetooth bridge
+curl "http://clawd.local/cc?state=waiting&msg=Hello&project=test"   # Wi-Fi
+echo "waiting|test|Hello" >> /dev/cu.usbmodem101                     # USB (use your port)
 ```
 
 Clawd flashes the alert and chimes; tap the screen to dismiss. Try `working`, `done` and `idle` too.
+`tests/run.sh` checks both helpers without Clawd attached.
 
 ## What's in here
 
 | Path | What it does |
 |---|---|
 | `install.sh` | One-step installer |
-| `claude-code/clawd-notify.sh` | Hook script. Reads Claude Code's event JSON and sends state, message and project to Clawd, in the background with a 2-second timeout so it never slows Claude down |
+| `claude-code/clawd-notify.sh` | Hook script. Reads Claude Code's event JSON and sends state, message and project to Clawd over Wi-Fi and USB. Returns immediately, so it never slows Claude down |
 | `claude-code/settings-snippet.json` | The hooks: `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop` |
 | `claude-code/merge_hooks.py` | Safely merges the hooks into `settings.json` |
 | `opencode/clawd.js` | opencode plugin (session, tool and permission events) |
-| `tests/run.sh` | Feeds simulated opencode events to the plugin and shows what Clawd would receive (needs Node and Python) |
-| `bluetooth/clawd-ble-bridge.py` | Bluetooth LE bridge on `127.0.0.1:8765` |
+| `tests/run.sh` | Runs both helpers against a stand-in Wi-Fi address and USB port and shows what Clawd would receive (needs Node and Python) |
 
-### Clawd's HTTP API
+### Talking to Clawd directly
 
-`GET /cc?state=working|waiting|done|idle&msg=TEXT&project=NAME` on `clawd.local` (or the bridge).
-Over Bluetooth, write `state|project|message` to characteristic `6c617764-636c-6177-6400-000000000002`
-(service `6c617764-636c-6177-6400-000000000001`, device name `Clawd`).
+- Wi-Fi: `GET http://clawd.local/cc?state=working|waiting|done|idle&msg=TEXT&project=NAME`
+- USB: write a line `state|project|message` to Clawd's serial port (any baud rate). Also accepts `view:next`, `view:prev`.
 
 ## Windows
 
-Claude Code runs hooks through Git Bash, so `clawd-notify.sh` works as-is: copy it to `%USERPROFILE%\.claude\` and add the hooks from `settings-snippet.json` to `%USERPROFILE%\.claude\settings.json`. Set `CLAWD_HOST` to Clawd's IP address.
+Claude Code runs hooks through Git Bash, so `clawd-notify.sh` works as-is: copy it to `%USERPROFILE%\.claude\` and add the hooks from `settings-snippet.json` to `%USERPROFILE%\.claude\settings.json`. Use Wi-Fi on Windows and set `CLAWD_HOST` to Clawd's IP address; the USB route is Mac and Linux only for now.
 
 ---
 

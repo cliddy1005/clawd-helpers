@@ -1,5 +1,7 @@
-// Feeds opencode-style events to the Clawd plugin and lets the sink record what it sends.
-process.env.CLAWD_HOST = "127.0.0.1:18080"; process.env.CLAWD_BRIDGE = "127.0.0.1:18081"
+// Feeds opencode-style events to the Clawd plugin. A local server stands in for Clawd's Wi-Fi
+// address and a plain file stands in for its USB port, so you can see what Clawd would receive.
+process.env.CLAWD_HOST = "127.0.0.1:18080"
+process.env.CLAWD_PORT = process.env.CLAWD_TEST_USB || "/tmp/clawd-usb-test.txt"
 const { ClawdPlugin } = await import(new URL("../opencode/clawd.js", import.meta.url))
 const hooks = await ClawdPlugin({ directory: "/Users/x/code/my-app", project: {}, client: {}, $: null, worktree: "" })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
