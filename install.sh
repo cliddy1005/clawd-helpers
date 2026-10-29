@@ -36,7 +36,7 @@ if [ ! -f "$SRC/claude-code/clawd-notify.sh" ]; then
   # running through curl | sh: fetch the files we need
   TMP=$(mktemp -d); SRC="$TMP"
   mkdir -p "$SRC/claude-code" "$SRC/opencode"
-  for f in claude-code/clawd-notify.sh claude-code/settings-snippet.json claude-code/merge_hooks.py opencode/clawd.js; do
+  for f in claude-code/clawd-notify.sh claude-code/settings-snippet.json claude-code/merge_hooks.py opencode/clawd.js opencode/clawd-v1.js; do
     curl -fsSL "$REPO_RAW/$f" -o "$SRC/$f"
   done
 fi
@@ -52,14 +52,17 @@ fi
 
 if [ -n "$WANT_OC" ]; then
   if [ -n "$OC_PROJECT" ]; then DEST="$PWD/.opencode/plugins"; else DEST="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins"; fi
-  echo "opencode: installing the Clawd plugin to $DEST"
+  # opencode 2.x changed the plugin format; 1.x needs the legacy plugin
+  PLUGIN="clawd.js"
+  case "$(opencode --version 2>/dev/null | sed 's/^[^0-9]*//')" in 1.*) PLUGIN="clawd-v1.js" ;; esac
+  echo "opencode: installing the Clawd plugin ($PLUGIN) to $DEST"
   mkdir -p "$DEST"
-  cp "$SRC/opencode/clawd.js" "$DEST/clawd.js"
+  cp "$SRC/opencode/$PLUGIN" "$DEST/clawd.js"
 fi
 
 [ -n "$TMP" ] && rm -rf "$TMP"
 
 echo
 [ -n "$WANT_CC" ] && echo "Restart Claude Code to load the hook."
-[ -n "$WANT_OC" ] && echo "Restart opencode to load the plugin."
+[ -n "$WANT_OC" ] && echo "Restart opencode to load the plugin (opencode 2 keeps a background server: run 'pkill -f \"opencode serve\"' if it's already running)."
 echo "Test it:  curl \"http://clawd.local/cc?state=waiting&msg=Hello&project=test\""

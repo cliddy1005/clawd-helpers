@@ -1,18 +1,21 @@
-// Clawd plugin for opencode
+// Clawd plugin for opencode 2.x
 // Install for all projects:  ./install.sh --opencode   (copies this file to ~/.config/opencode/plugins/)
 // Install for one project:   ./install.sh --opencode-project   (copies it to ./.opencode/plugins/)
-// Restart opencode afterwards.
+// Restart opencode afterwards. (opencode 1.x needs clawd-v1.js; the installer picks the right one.)
 //
 // Sends status to Clawd over Wi-Fi (clawd.local) and, when Clawd is plugged into this computer, over USB:
-//   session.created            -> idle
-//   session.status busy, tools -> working   (at most every 5 s)
-//   permission.asked           -> waiting   ("Claude needs you" alert with opencode's question)
-//   permission.replied         -> working
-//   session.error              -> waiting   (so you notice)
-//   session.idle               -> done
+//   session.created                     -> idle
+//   session.execution.started, tools    -> working   (at most every 5 s)
+//   permission.asked                    -> waiting   ("Claude needs you" alert with opencode's question)
+//   permission.replied                  -> working
+//   session.execution.failed            -> waiting   (so you notice)
+//   session.execution.succeeded         -> done
+//   session.execution.interrupted       -> idle
 // Optional settings: CLAWD_HOST (Clawd's IP), CLAWD_PORT (USB port, or "none").
+// opencode keeps a background server running; restart it after changing these settings.
 import { readdirSync, existsSync } from "node:fs"
 import { appendFile } from "node:fs/promises"
+import { basename } from "node:path"
 
 const HOST = process.env.CLAWD_HOST || "clawd.local"
 
@@ -29,7 +32,7 @@ function usbPorts() {
 }
 
 let last = { state: "", at: 0 }
-function send(state, msg = "", project = "") {
+export function send(state, msg = "", project = "") {
   // tools fire constantly while working; send "working" at most every 5 s
   const now = Date.now()
   if (state === last.state && state === "working" && now - last.at < 5000) return
@@ -41,21 +44,33 @@ function send(state, msg = "", project = "") {
   for (const port of usbPorts()) appendFile(port, line).catch(() => {})
 }
 
-export const ClawdPlugin = async ({ directory }) => {
-  const project = (directory || "").split("/").filter(Boolean).pop() || "opencode"
-  return {
-    event: async ({ event }) => {
-      switch (event.type) {
-        case "session.created":    send("idle", "", project); break
-        case "session.idle":       send("done", "opencode finished", project); break
-        case "permission.asked":   send("waiting", event.properties?.title || "opencode needs your permission", project); break
-        case "permission.replied": send("working", "", project); break
-        case "session.error":      send("waiting", "opencode hit an error" + (event.properties?.error?.message ? ": " + event.properties.error.message : ""), project); break
-        case "session.status":
-          if (event.properties?.status?.type === "busy") send("working", "", project)
-          break
-      }
-    },
-    "tool.execute.before": async () => send("working", "", project),
+export function handle(event, project) {
+  const p = event.properties ?? event.data ?? event
+  switch (event.type) {
+    case "session.created":               return send("idle", "", project)
+    case "session.execution.started":
+    case "session.tool.called":           return send("working", "", project)
+    case "permission.asked":              return send("waiting", p.title || p.message || p.permission || p.action || "opencode needs your permission", project)
+    case "permission.replied":            return send("working", "", project)
+    case "session.execution.failed":
+    case "session.error":                 return send("waiting", "opencode hit an error" + (p.error?.message ? ": " + p.error.message : ""), project)
+    case "session.execution.succeeded":
+    case "session.idle":                  return send("done", "opencode finished", project)
+    case "session.execution.interrupted": return send("idle", "", project)
   }
+}
+
+export default {
+  id: "clawd",
+  async setup(ctx) {
+    const dir = ctx.location?.project?.directory || ctx.location?.directory || ""
+    const project = basename(dir) || "opencode"
+    const stop = new AbortController()
+    ;(async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: stop.signal })) handle(event, project)
+      } catch {}
+    })()
+    return () => stop.abort()
+  },
 }
