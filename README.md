@@ -28,13 +28,39 @@ cd clawd-helpers
 ./install.sh
 ```
 
-The installer:
+With no options, the installer sets up whichever of Claude Code and opencode it finds on the computer. Choose explicitly with:
 
-- copies `clawd-notify.sh` to `~/.claude/`
-- adds five hooks to `~/.claude/settings.json`, keeping your other settings and a timestamped backup (it never adds a hook twice, and stops without changes if your settings file isn't valid JSON)
-- installs the opencode plugin to `~/.config/opencode/plugins/` if opencode is on the computer
+| Option | Installs |
+|---|---|
+| `--claude-code` | Claude Code hook only |
+| `--opencode` | opencode plugin for all projects (`~/.config/opencode/plugins/`) |
+| `--opencode-project` | opencode plugin for the current project only (`./.opencode/plugins/`) |
+| `--all` | Both |
 
-Restart Claude Code (and opencode) afterwards.
+With the one-line install, pass options after `sh -s --`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/cliddy1005/clawd-helpers/main/install.sh | sh -s -- --opencode
+```
+
+For Claude Code, the installer copies `clawd-notify.sh` to `~/.claude/` and adds five hooks to `~/.claude/settings.json`, keeping your other settings and a timestamped backup. It never adds a hook twice, and stops without changes if your settings file isn't valid JSON. Running it again is safe.
+
+Restart Claude Code or opencode afterwards.
+
+## opencode
+
+The plugin (`opencode/clawd.js`) listens to opencode's events and drives the same light and alerts as Claude Code:
+
+| opencode event | Clawd shows |
+|---|---|
+| `session.created` | Blue light (idle) |
+| `session.status` busy, or a tool runs | Pulsing amber (working), sent at most every 5 seconds |
+| `permission.asked` | "Claude needs you" alert with opencode's question |
+| `permission.replied` | Amber (working) again |
+| `session.error` | Alert, so you notice the error |
+| `session.idle` | Green light and done chime |
+
+To install by hand, copy `opencode/clawd.js` into `~/.config/opencode/plugins/` (all projects) or `.opencode/plugins/` in a project, then restart opencode. It uses the same `CLAWD_HOST` and `CLAWD_BRIDGE` settings as the Claude Code hook.
 
 ## Reaching Clawd
 
@@ -74,6 +100,7 @@ Clawd flashes the alert and chimes; tap the screen to dismiss. Try `working`, `d
 | `claude-code/settings-snippet.json` | The hooks: `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop` |
 | `claude-code/merge_hooks.py` | Safely merges the hooks into `settings.json` |
 | `opencode/clawd.js` | opencode plugin (session, tool and permission events) |
+| `tests/run.sh` | Feeds simulated opencode events to the plugin and shows what Clawd would receive (needs Node and Python) |
 | `bluetooth/clawd-ble-bridge.py` | Bluetooth LE bridge on `127.0.0.1:8765` |
 
 ### Clawd's HTTP API
