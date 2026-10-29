@@ -44,13 +44,22 @@ export function send(state, msg = "", project = "") {
   for (const port of usbPorts()) appendFile(port, line).catch(() => {})
 }
 
-export function handle(event, project) {
+// opencode 2 permission requests carry { action: "shell", resources: ["npm install"] }
+function permissionText(p) {
+  const what = (p.resources || []).join(", ")
+  if (p.action === "shell" && what) return "Run: " + what
+  if (p.action && what) return p.action + ": " + what
+  return p.title || p.message || p.action || "opencode needs your permission"
+}
+
+export function handle(event, fallbackProject) {
   const p = event.properties ?? event.data ?? event
+  const project = basename(event.location?.directory || "") || fallbackProject
   switch (event.type) {
     case "session.created":               return send("idle", "", project)
     case "session.execution.started":
     case "session.tool.called":           return send("working", "", project)
-    case "permission.asked":              return send("waiting", p.title || p.message || p.permission || p.action || "opencode needs your permission", project)
+    case "permission.asked":              return send("waiting", permissionText(p), project)
     case "permission.replied":            return send("working", "", project)
     case "session.execution.failed":
     case "session.error":                 return send("waiting", "opencode hit an error" + (p.error?.message ? ": " + p.error.message : ""), project)

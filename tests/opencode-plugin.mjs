@@ -8,7 +8,7 @@ const events = [
   { type: "session.created", properties: {} },
   { type: "session.execution.started", properties: {} },
   { type: "session.tool.called", properties: { tool: "read" } },          // throttled: no second "working"
-  { type: "permission.asked", data: { title: "Run npm install?" } },     // payload under "data" also handled
+  { type: "permission.asked", location: { directory: "/Users/x/code/my-app" }, data: { action: "shell", resources: ["npm install"] } },  // real opencode 2.2 shape
   { type: "permission.replied", properties: { reply: "once" } },
   { type: "session.execution.succeeded", properties: {} },
   { type: "session.text.delta", properties: {} },                        // ignored
