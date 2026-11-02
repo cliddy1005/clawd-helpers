@@ -19,8 +19,8 @@ MSG=$(printf '%s' "$INPUT" | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^
 CWD=$(printf '%s' "$INPUT" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 PROJECT=$(basename "${CWD:-$PWD}")
 
-# Wi-Fi
-( curl -s -m 2 -o /dev/null -G "http://$HOST/cc" \
+# Wi-Fi. -4: macOS otherwise waits ~5 s for an IPv6 answer to "clawd.local" that never comes.
+( curl -4 -s -m 2 -o /dev/null -G "http://$HOST/cc" \
     --data-urlencode "state=$STATE" \
     --data-urlencode "msg=$MSG" \
     --data-urlencode "project=$PROJECT" & ) >/dev/null 2>&1

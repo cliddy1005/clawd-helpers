@@ -12,9 +12,22 @@
 //   session.idle               -> done
 // Optional settings: CLAWD_HOST (Clawd's IP), CLAWD_PORT (USB port, or "none").
 import { readdirSync, existsSync } from "node:fs"
+import { lookup } from "node:dns/promises"
 import { appendFile } from "node:fs/promises"
 
 const HOST = process.env.CLAWD_HOST || "clawd.local"
+
+// Look up clawd.local over IPv4 only and remember it for a minute: a normal lookup on macOS
+// waits ~5 s for an IPv6 answer that Clawd never sends, longer than the 2 s send timeout.
+let cached = { ip: "", at: 0 }
+async function wifiHost() {
+  const [name, port] = HOST.split(":")
+  if (/^[\d.]+$/.test(name)) return HOST
+  if (cached.ip && Date.now() - cached.at < 60000) return cached.ip + (port ? ":" + port : "")
+  const { address } = await lookup(name, { family: 4 })
+  cached = { ip: address, at: Date.now() }
+  return address + (port ? ":" + port : "")
+}
 
 function usbPorts() {
   const forced = process.env.CLAWD_PORT
@@ -36,7 +49,7 @@ function send(state, msg = "", project = "") {
   last = { state, at: now }
   msg = String(msg).slice(0, 200)
   const q = new URLSearchParams({ state, msg, project })
-  fetch(`http://${HOST}/cc?${q}`, { signal: AbortSignal.timeout(2000) }).catch(() => {})
+  wifiHost().then(h => fetch(`http://${h}/cc?${q}`, { signal: AbortSignal.timeout(2000) })).catch(() => {})
   const line = `${state}|${project}|${msg}`.replace(/[\r\n]+/g, " ") + "\n"
   for (const port of usbPorts()) appendFile(port, line).catch(() => {})
 }
